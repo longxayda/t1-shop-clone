@@ -1,6 +1,6 @@
 const express = require("express");
 const cors = require("cors");
-const { MongoClient } = require("mongodb");
+const { MongoClient, ObjectId } = require("mongodb");
 
 require("dotenv").config();
 
@@ -75,4 +75,51 @@ app.post("/register", async (req, res) => {
 
 app.listen(port, () => {
   console.log(`Example app listening on port ${port}`);
+});
+
+app.post("/products", async (req, res) => {
+  const client = await connect(uri);
+  const db = await client.db();
+  const fakeData = await fetch("https://dummyjson.com/products")
+    .then((apiRes) => apiRes.json())
+    .then((data) => data.products);
+  fakeData.forEach((product) => {
+    const newProduct = {};
+    Object.keys(product).forEach((key) => {
+      if (key.toLowerCase() != "id") {
+        newProduct[key] = product[key];
+      } else {
+        newProduct["_id"] = product[key];
+      }
+    });
+    db.collection("products")
+      .insertOne(newProduct)
+      .then((res) => {
+        console.log(`Inserted product with _id = ${newProduct["_id"]}`);
+      })
+      .catch((err) => {
+        console.log(`Cannot insert product with _id = ${newProduct["_id"]}`);
+      })
+  });
+  res.send("Success");
+});
+
+app.get("/products", async (req, res) => {
+  const client = await connect(uri);
+  const db = await client.db();
+  const result = await db.collection("products").find();
+  const data = [];
+  for await (const doc of result) {
+    data.push(doc);
+  }
+  res.send({
+    length: data.length,
+    data: data,
+  });
+});
+
+app.delete("/products", async (req, res) => {
+  const client = await connect(uri);
+  const db = await client.db();
+  res.send(await db.collection("products").drop());
 });
